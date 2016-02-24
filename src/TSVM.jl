@@ -1,6 +1,7 @@
 module TSVM
 
 using Collections
+using JuMP
 
 export TSVMData, train_tsvm
 
@@ -9,8 +10,30 @@ type TSVMData
     labels
 end
 
+function constrain_vectors(m, y, w, x, b, xi)
+    for i in 1:length(x)
+        @addConstraint(m, y[i] * (dot(w, x[i]) + b) >= 1 - xi[i])
+    end
+end
+
 function solve_svm_qp(training_features, training_labels, test_features,
         test_predictions, C, C_star_minus, C_star_plus)
+    # OP 3 in Joachims, 1999
+    m = Model()
+    @defVar(m, weights[1:length(training_features[1])])
+    weights = randn(length(weights))
+    @defVar(m, bias)
+    bias = 0
+    @defVar(m, m_training_features[1:length(training_features),1:length(training_features[1])])
+    m_training_features = copy(training_features)
+    @defVar(m, m_training_labels[1:length(training_labels)])
+    m_training_labels = copy(training_labels)
+    @defVar(m, m_training_margin[1:length(training_labels)])
+    m_training_margin = rand(length(training_labels))
+    constrain_vectors(m, m_training_labels, weights, m_training_features, bias,
+        m_training_margin)
+    if length(test_predictions) > 0
+    end
 end
 
 function classify_examples(features::Matrix{AbstractFloat},
