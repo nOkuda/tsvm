@@ -1,6 +1,8 @@
 using ArgParse
 include("TSVM.jl")
 using TSVM
+include("utils.jl")
+using utils
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -12,26 +14,11 @@ function parse_commandline()
     return parse_args(s)
 end
 
-function get_data(filename)
-    data = Array{AbstractFloat}[]
-    open(filename) do fh
-        for line in eachline(fh)
-            push!(data, [parse(Float64, a) for a in split(strip(line),
-                    ','; keep=false)])
-        end
-    end
-    data_length = length(data[1])
-    return TSVMData(
-        [a[1:data_length-1] for a in data],
-        [a[data_length] for a in data])
-end
-
 function main()
     parsed_args = parse_commandline()
-    println("$(parsed_args["datafile"])")
     data = get_data(parsed_args["datafile"])
-    predictions = train_tsvm([1, 6], collect(2:5), data, 0.5, 1.0, 1.0)
-    println(predictions)
+    predictions = train_tsvm([1, 6], collect(2:5), data, 0.5, 1.0, 1.0, true)
+    println("final predictions: $(predictions)")
 end
 
 main()
