@@ -17,7 +17,7 @@ end
 function main()
     parsed_args = parse_commandline()
     data = get_data(parsed_args["datafile"])
-    predictions = train_tsvm([1, 6], collect(2:5), data, 0.5, 1.0, 1.0, true)
+    predictions = train_tsvm([1, 6], collect(2:5), data, 1.0, 1.0, true)
     println("final predictions: $(predictions)")
 end
 

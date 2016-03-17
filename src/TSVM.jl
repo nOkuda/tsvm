@@ -99,14 +99,19 @@ function find_problems(predictions::Vector{Int64}, xi_star::Vector{Float64})
     return (index1, index2)
 end
 
+function compute_fraction(data, trainids)
+    return sum(ones(length(trainids)) .* (data.labels[trainids] .== 1)) /
+        length(trainids)
+end
+
 function train_tsvm(
         training_ids::Vector{Int64},
         test_ids::Vector{Int64},
         data::TSVMData,
-        plus_percentage::Float64,
         c::Float64,
         c_star::Float64,
         debug::Bool)
+    plus_percentage = compute_fraction(data, training_ids)
     num_plus = round(Int, plus_percentage*length(test_ids))
     # based on Figure 4 of Joachims' 1999 transductive SVM paper
     training_features = data.features[training_ids]

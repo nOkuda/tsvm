@@ -10,10 +10,6 @@ function parse_commandline()
         "datafile"
             help = "file where data is kept"
             required = true
-        "--frac"
-            help = "fraction of positive in example"
-            arg_type = Float64
-            default = 0.5
         "--c"
             help = "penalty weighting for training examples"
             arg_type = Float64
@@ -26,7 +22,7 @@ function parse_commandline()
     return parse_args(s)
 end
 
-function eval(predictions, labels)
+function evaluate(predictions, labels)
     correct = 0
     for i in 1:length(predictions)
         if predictions[i] == labels[i]
@@ -36,22 +32,24 @@ function eval(predictions, labels)
     return correct / length(predictions)
 end
 
-function cross_val(data, k, frac, c, cstar)
+function cross_val(data, k, c, cstar)
     if k < 4
         k = 4
     end
+    results = []
     randorder = shuffle(collect(1:length(data.features)))
-    testsize = convert(Int, length(data.features) / k)
-    result = 0.0
+    testsize = trunc(Int, length(data.features) / k)
+    trainids = randorder[testsize+1:end]
+    testids = randorder[1:testsize]
     predictions = train_tsvm(
-        randorder[testsize+1:end],
-        randorder[1:testsize],
+        trainids,
+        testids,
         data,
-        frac,
         c,
         cstar,
         false)
-    result += eval(predictions, data.labels[randorder[1:testsize]]) / k
+    push!(
+        results, evaluate(predictions, data.labels[randorder[1:testsize]]))
     for i in 2:k-1
         trainids = randorder[1:testsize*(i-1)]
         append!(trainids, randorder[(testsize*(i)+1):end])
@@ -60,30 +58,32 @@ function cross_val(data, k, frac, c, cstar)
             trainids,
             testids,
             data,
-            frac,
             c,
             cstar,
             false)
-        result += eval(predictions, data.labels[testids]) / k
+        push!(results, evaluate(predictions, data.labels[testids]))
     end
+    trainids = randorder[1:(testsize*(k-1)+1)]
+    testids = randorder[(testsize*(k-1)+1):end]
     predictions = train_tsvm(
-        randorder[1:(testsize*(k-1)+1)],
-        randorder[(testsize*(k-1)+1):end],
+        trainids,
+        testids,
         data,
-        frac,
         c,
         cstar,
         false)
-    result += eval(
-        predictions, data.labels[randorder[(testsize*(k-1)+1):end]]) / k
-    return result
+    push!(results, evaluate(
+        predictions, data.labels[randorder[(testsize*(k-1)+1):end]]))
+    return results
 end
 
 function main()
     parsed_args = parse_commandline()
     data = get_data(parsed_args["datafile"])
-    cross_val(
-        data, 10, parsed_args["frac"], parsed_args["c"], parsed_args["cstar"])
+    k = 10
+    results = cross_val(data, k, parsed_args["c"], parsed_args["cstar"])
+    println(results)
+    println(sum(results)/k)
 end
 
 main()
