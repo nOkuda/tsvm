@@ -77,11 +77,31 @@ function cross_val(data, k, c, cstar)
     return results
 end
 
+function small_test(data, k, c, cstar)
+    trainsize = convert(Integer, trunc(0.1 * length(data.features)))
+    results = []
+    for _ in 1:k
+        randorder = shuffle(collect(1:length(data.features)))
+        predictions = train_tsvm(
+            randorder[1:trainsize],
+            randorder[trainsize+1:end],
+            data,
+            c,
+            cstar,
+            false
+        )
+        push!(results, evaluate(
+            predictions, data.labels[randorder[trainsize+1:end]]))
+    end
+    return results
+end
+
 function main()
     parsed_args = parse_commandline()
     data = get_data(parsed_args["datafile"])
-    k = 10
+    k = 4
     results = cross_val(data, k, parsed_args["c"], parsed_args["cstar"])
+    # results = small_test(data, k, parsed_args["c"], parsed_args["cstar"])
     println(results)
     println(sum(results)/k)
 end

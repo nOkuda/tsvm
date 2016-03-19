@@ -3,7 +3,7 @@ module TSVM
 using JuMP
 using Ipopt
 
-export TSVMData, train_tsvm
+export TSVMData, train_tsvm, train_svm
 
 type TSVMData
     features
@@ -12,7 +12,8 @@ end
 
 function constrain_vectors!(m, y, w, x, b, xi)
     for i in 1:length(x)
-        @addConstraint(m, y[i] * (dot(w, x[i]) + b) >= 1 - xi[i])
+        @addConstraint(m, y[i] * (dot(w, x[i]) + b) >= (1 - xi[i]))
+        @addConstraint(m, xi[i] >= 0)
     end
 end
 
@@ -73,7 +74,8 @@ function classify_examples(features::Vector{Vector{AbstractFloat}},
         num_plus::Int64)
     raw_results = [dot(features[i], weights) for i in 1:length(features)] + bias
     pq = Collections.PriorityQueue(1:length(raw_results), raw_results, Base.Order.Reverse)
-    best_indices = [Collections.dequeue!(pq) for a in 1:num_plus]
+    ordered_indices = [Collections.dequeue!(pq) for a in 1:length(raw_results)]
+    best_indices = ordered_indices[1:num_plus]
     result = -1*ones(Int64, length(features))
     result[best_indices] = 1
     return result
@@ -84,7 +86,7 @@ function find_problems(predictions::Vector{Int64}, xi_star::Vector{Float64})
     index2 = -1
     found_problem = false
     for i in 1:length(predictions)-1
-        for j in 2:length(predictions)
+        for j in i+1:length(predictions)
             if (predictions[i] * predictions[j] < 0) && (xi_star[j] > 0) &&
                     (xi_star[i] + xi_star[j] > 2)
                 index1 = i
@@ -102,6 +104,29 @@ end
 function compute_fraction(data, trainids)
     return sum(ones(length(trainids)) .* (data.labels[trainids] .== 1)) /
         length(trainids)
+end
+
+function train_svm(
+        training_ids::Vector{Int64},
+        test_ids::Vector{Int64},
+        data::TSVMData,
+        c::Float64,
+        c_star::Float64,
+        debug::Bool)
+    plus_percentage = compute_fraction(data, training_ids)
+    num_plus = round(Int, plus_percentage*length(test_ids))
+    training_features = data.features[training_ids]
+    training_labels = data.labels[training_ids]
+    (w, b, xi, _) = solve_svm_qp(
+        training_features,
+        training_labels,
+        [],
+        [],
+        c,
+        0,
+        0)
+    test_features = data.features[test_ids]
+    return classify_examples(test_features, w, b, num_plus)
 end
 
 function train_tsvm(
