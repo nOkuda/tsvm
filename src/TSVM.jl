@@ -11,24 +11,9 @@ type TSVMData
 end
 
 function constrain_vectors!(m, y, w, x, b, xi)
-    for i in 1:size(x, 1)
-        @addConstraint(m, (y[i] * (dot(w, vec(x[i, :])) + b)) >= (1 - xi[i]))
+    for i in 1:length(x)
+        @addConstraint(m, (y[i] * (dot(w, x[i]) + b)) >= (1 - xi[i]))
         @addConstraint(m, xi[i] >= 0)
-    end
-end
-
-function nonrandomly_fill!(dest)
-    for i in 1:length(dest)
-        setValue(dest[i], 0)
-    end
-end
-
-function fill_constants!(dest, src, m)
-    for i in 1:length(src)
-        for j in 1:length(src[1])
-            setValue(dest[i,j], src[i][j])
-            @addConstraint(m, dest[i,j] == src[i][j])
-        end
     end
 end
 
@@ -41,39 +26,27 @@ function solve_svm_qp(
         C_star_minus,
         C_star_plus)
     # OP 3 in Joachims, 1999
-    m = Model(solver=IpoptSolver(print_level=0))
+    m = Model(solver=IpoptSolver(print_level=5))
     @defVar(m, weights[1:length(training_features[1])])
-    nonrandomly_fill!(weights)
     @defVar(m, bias)
-    setValue(bias, 0.0)
     @defVar(m, m_training_margin[1:length(training_labels)])
-    nonrandomly_fill!(m_training_margin)
-    @defVar(
-        m, m_training_data[1:length(training_features),1:length(training_features[1])])
-    fill_constants!(m_training_data, training_features, m)
     constrain_vectors!(
-        m, training_labels, weights, m_training_data, bias, m_training_margin)
-    @defVar(m, m_C == C)
+        m, training_labels, weights, training_features, bias, m_training_margin)
     if length(test_predictions) > 0
         @defVar(m, m_test_margin[1:length(test_predictions)])
-        nonrandomly_fill!(m_test_margin)
-        @defVar(m, m_test_data[1:length(test_features),1:length(test_features[1])])
-        fill_constants!(m_test_data, test_features, m)
         constrain_vectors!(
-            m, test_predictions, weights, m_test_data, bias, m_test_margin)
-        @defVar(m, m_C_star_minus == C_star_minus)
-        @defVar(m, m_C_star_plus == C_star_plus)
+            m, test_predictions, weights, test_features, bias, m_test_margin)
         @setObjective(
-            m, Min, 0.5*dot(weights, weights) + m_C*sum(m_training_margin) +
-            m_C_star_minus*sum(m_test_margin .* (test_predictions .== -1)) +
-            m_C_star_plus*sum(m_test_margin .* (test_predictions .== 1)))
+            m, Min, 0.5*dot(weights, weights) + C*sum(m_training_margin) +
+            C_star_minus*sum(m_test_margin .* (test_predictions .== -1)) +
+            C_star_plus*sum(m_test_margin .* (test_predictions .== 1)))
         status = solve(m)
         return [getValue(weights[i]) for i in 1:length(weights)],
             getValue(bias),
             [getValue(m_training_margin[i]) for i in 1:length(m_training_margin)],
             [getValue(m_test_margin[i]) for i in 1:length(m_test_margin)]
     end
-    @setObjective(m, Min, 0.5*dot(weights, weights) + m_C*sum(m_training_margin))
+    @setObjective(m, Min, 0.5*dot(weights, weights) + C*sum(m_training_margin))
     status = solve(m)
     return [getValue(weights[i]) for i in 1:length(weights)],
         getValue(bias),
@@ -97,8 +70,8 @@ function find_problems(predictions::Vector{Int64}, xi_star::Vector{Float64})
     index1 = -1
     index2 = -1
     found_problem = false
-    for i in 1:length(predictions)-1
-        for j in i+1:length(predictions)
+    for i in 1:(length(predictions)-1)
+        for j in (i+1):length(predictions)
             if (predictions[i] * predictions[j] < 0) && (xi_star[i] > 0) &&
                     (xi_star[j] > 0) && (xi_star[i] + xi_star[j] > 2)
                 index1 = i
@@ -187,17 +160,19 @@ function train_tsvm(
         if debug
             message = "Iteration: $(count)"
             println(message)
+            #=
             print_report(
                 message, predictions, w, b, xi, xi_star)
             count += 1
+            =#
         end
         continue_refinement = true
         while continue_refinement
             (index1, index2) = find_problems(predictions, xi_star)
-            if debug
-                print_problems(index1, index2, xi_star)
-            end
             if (index1 != -1) && (index2 != -1)
+                if debug
+                    print_problems(index1, index2, xi_star)
+                end
                 predictions[index1] = -1*predictions[index1]
                 predictions[index2] = -1*predictions[index2]
                 (w, b, xi, xi_star) = solve_svm_qp(
@@ -209,7 +184,7 @@ function train_tsvm(
                     c_star_minus,
                     c_star_plus)
                 if debug
-                    message = "Iteration: $(count)\nSwapping $(index1) and $(index2)"
+                    message = "Iteration: $(count)\nSwapped $(index1) and $(index2)"
                     println(message)
                     #=
                     print_report(
