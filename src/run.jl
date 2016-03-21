@@ -88,7 +88,7 @@ function small_test(data, k, c, cstar)
             data,
             c,
             cstar,
-            false
+            true
         )
         push!(results, evaluate(
             predictions, data.labels[randorder[trainsize+1:end]]))
@@ -99,9 +99,9 @@ end
 function main()
     parsed_args = parse_commandline()
     data = get_data(parsed_args["datafile"])
-    k = 4
-    results = cross_val(data, k, parsed_args["c"], parsed_args["cstar"])
-    # results = small_test(data, k, parsed_args["c"], parsed_args["cstar"])
+    k = 1
+    # results = cross_val(data, k, parsed_args["c"], parsed_args["cstar"])
+    results = small_test(data, k, parsed_args["c"], parsed_args["cstar"])
     println(results)
     println(sum(results)/k)
 end
