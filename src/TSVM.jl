@@ -38,7 +38,7 @@ function solve_svm_qp(
         C_star_minus,
         C_star_plus)
     # OP 3 in Joachims, 1999
-    m = Model()
+    m = Model(solver=IpoptSolver(print_level=0))
     @defVar(m, weights[1:length(training_features[1])])
     randomly_fill!(weights)
     @defVar(m, bias)
