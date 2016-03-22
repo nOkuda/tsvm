@@ -32,7 +32,8 @@ function solve_svm_qp(
         C_star_minus,
         C_star_plus)
     # OP 3 in Joachims, 1999
-    m = Model(solver=IpoptSolver(print_level=0))
+    m = Model(solver=IpoptSolver(
+        print_level=0))
     @defVar(m, weights[1:length(training_features[1])])
     initialize_vars!(weights, 1.0)
     @defVar(m, bias)
@@ -82,14 +83,17 @@ function classify_examples(features::Vector{Vector{AbstractFloat}},
     return result
 end
 
-function find_problems(predictions::Vector{Int64}, xi_star::Vector{Float64})
+function find_problems(
+        predictions::Vector{Int64}, xi_star::Vector{Float64}, swapped_dict)
     index1 = -1
     index2 = -1
     found_problem = false
     for i in 1:(length(predictions)-1)
         for j in (i+1):length(predictions)
             if ((predictions[i] * predictions[j] < 0) && (xi_star[i] > 0) &&
-                    (xi_star[j] > 0) && (xi_star[i] + xi_star[j] > 2))
+                    (xi_star[j] > 0) && (xi_star[i] + xi_star[j] > 2)) &&
+                    (get(swapped_dict, (i,j), 0) < 10)
+                swapped_dict[(i,j)] = get(swapped_dict, (i,j), 0) + 1
                 index1 = i
                 index2 = j
                 found_problem = true
@@ -163,11 +167,9 @@ function train_tsvm(
     if debug
         message = "Initial"
         println(message)
-        #=
         print_report(
             message, predictions, w, b, xi, [])
         print_cstars(c_star_plus, c_star_minus)
-        =#
     end
     count = 1
     while (c_star_minus < c_star) || (c_star_plus < c_star)
@@ -182,15 +184,16 @@ function train_tsvm(
         if debug
             message = "Iteration: $(count)"
             println(message)
-            #=
             print_report(
                 message, predictions, w, b, xi, xi_star)
-            =#
             count += 1
         end
         continue_refinement = true
-        while continue_refinement
-            (index1, index2) = find_problems(predictions, xi_star)
+        swapped_dict = Dict()
+        swapped_iter = 0
+        while continue_refinement && (swapped_iter < 50)
+            swapped_iter += 1
+            (index1, index2) = find_problems(predictions, xi_star, swapped_dict)
             if (index1 != -1) && (index2 != -1)
                 if debug
                     println("#### Sum: $(xi_star[index1] + xi_star[index2])")
@@ -209,52 +212,13 @@ function train_tsvm(
                 if debug
                     message = "Iteration: $(count)\nSwapped $(index1) and $(index2)"
                     println(message)
-                    #=
                     print_report(
                         message, predictions, w, b, xi, xi_star)
-                    =#
                     count += 1
                 end
             else
                 continue_refinement = false
             end
-            #=
-            found_problem = false
-            for i in 1:length(predictions)-1
-                for j in i+1:length(predictions)
-                    if ((predictions[i] * predictions[j] < 0) && (xi_star[i] > 0) &&
-                            (xi_star[j] > 0) && (xi_star[i] + xi_star[j] > 2))
-                        if debug
-                            print_problems(i, j, xi_star)
-                            println("#### Sum: $(xi_star[i] + xi_star[j])")
-                        end
-                        found_problem = true
-                        predictions[i] = -1*predictions[i]
-                        predictions[j] = -1*predictions[j]
-                        (w, b, xi, xi_star) = solve_svm_qp(
-                            training_features,
-                            training_labels,
-                            test_features,
-                            predictions,
-                            c,
-                            c_star_minus,
-                            c_star_plus)
-                        if debug
-                            message = "Iteration: $(count)\nSwapped $(i) and $(j)"
-                            println(message)
-                            println(objective_f(
-                                w, c, xi, c_star_minus, c_star_plus, xi_star))
-                            #=
-                            print_report(
-                                message, predictions, w, b, xi, xi_star)
-                            =#
-                            count += 1
-                        end
-                    end
-                end
-            end
-            continue_refinement = found_problem
-            =#
         end
         c_star_minus = min(c_star_minus*2, c_star)
         c_star_plus = min(c_star_plus*2, c_star)

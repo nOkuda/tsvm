@@ -26,7 +26,7 @@ def small_test(model, features, labels, k):
 def run():
     data = {
         'forests_d': load_data('../data/forests_d.data'),
-        'hiv1': load_data('../data/hiv1.data')}
+        'vert': load_data('../data/vert.data')}
     models = {
         'linear_svm': svm.SVC(kernel='linear', C=1),
         'rbf_svm': svm.SVC(kernel='rbf', C=1)}
@@ -34,12 +34,12 @@ def run():
         features = data[d][:, :-1]
         labels = data[d][:, -1]
         for m in models:
-            '''
             scores = cross_validation.cross_val_score(
-                models[m], features, labels, cv=10)
+                models[m], features, labels, cv=4)
             '''
             scores = small_test(models[m], features, labels, 10)
-            with open('../results/'+d+'.small.'+m, 'w') as ofh:
+            '''
+            with open('../results/'+d+'.cross4.'+m, 'w') as ofh:
                 ofh.write(' '.join([str(a) for a in scores]))
                 ofh.write('\n')
                 ofh.write(str(scores.mean()))

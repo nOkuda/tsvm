@@ -41,7 +41,7 @@ function cross_val(data, k, c, cstar)
     testsize = trunc(Int, length(data.features) / k)
     trainids = randorder[testsize+1:end]
     testids = randorder[1:testsize]
-    predictions = train_tsvm(
+    predictions = train_svm(
         trainids,
         testids,
         data,
@@ -54,7 +54,7 @@ function cross_val(data, k, c, cstar)
         trainids = randorder[1:testsize*(i-1)]
         append!(trainids, randorder[(testsize*(i)+1):end])
         testids = randorder[(testsize*(i-1)+1):(testsize*(i))]
-        predictions = train_tsvm(
+        predictions = train_svm(
             trainids,
             testids,
             data,
@@ -65,7 +65,7 @@ function cross_val(data, k, c, cstar)
     end
     trainids = randorder[1:(testsize*(k-1)+1)]
     testids = randorder[(testsize*(k-1)+1):end]
-    predictions = train_tsvm(
+    predictions = train_svm(
         trainids,
         testids,
         data,
@@ -82,7 +82,7 @@ function small_test(data, k, c, cstar)
     results = []
     for _ in 1:k
         randorder = shuffle(collect(1:length(data.features)))
-        predictions = train_tsvm(
+        predictions = train_svm(
             randorder[1:trainsize],
             randorder[trainsize+1:end],
             data,
@@ -99,9 +99,9 @@ end
 function main()
     parsed_args = parse_commandline()
     data = get_data(parsed_args["datafile"])
-    k = 1
-    # results = cross_val(data, k, parsed_args["c"], parsed_args["cstar"])
-    results = small_test(data, k, parsed_args["c"], parsed_args["cstar"])
+    k = 10
+    results = cross_val(data, k, parsed_args["c"], parsed_args["cstar"])
+    # results = small_test(data, k, parsed_args["c"], parsed_args["cstar"])
     println(results)
     println(sum(results)/k)
 end
